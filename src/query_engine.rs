@@ -6,7 +6,7 @@ use value::ValueType;
 #[derive(Debug)]
 pub struct Query {
     pub select: Vec<usize>,
-    pub filter: Condition,
+    pub filter: Expr,
     pub groupBy: Vec<usize>,
     pub aggregate: Vec<(Aggregator, usize)>,
 }
@@ -40,11 +40,11 @@ impl Aggregator {
 }
 
 #[derive(Debug)]
-pub enum Condition {
+pub enum Expr {
     True,
     False,
     Column(usize),
-    Func(FuncType, Box<Condition>, Box<Condition>),
+    Func(FuncType, Box<Expr>, Box<Expr>),
     Const(ValueType),
 }
 
@@ -75,7 +75,7 @@ fn run(query: &Query, source: &Vec<Vec<ValueType>>) -> Vec<Vec<ValueType>> {
 
 fn run_aggregate(
     select: &Vec<usize>,
-    filter: &Condition,
+    filter: &Expr,
     aggregation: &Vec<(Aggregator, usize)>,
     source: &Vec<Vec<ValueType>>,
 ) -> Vec<Vec<ValueType>> {
@@ -101,8 +101,8 @@ fn run_aggregate(
     result
 }
 
-fn eval(record: &Vec<ValueType>, condition: &Condition) -> ValueType {
-    use self::Condition::*;
+fn eval(record: &Vec<ValueType>, condition: &Expr) -> ValueType {
+    use self::Expr::*;
     use self::ValueType::*;
     match condition {
         &True => Bool(true),
@@ -136,7 +136,7 @@ pub fn test() {
         record(931, "/", 800),
     ];
 
-    use self::Condition::*;
+    use self::Expr::*;
     use self::FuncType::*;
     use ValueType::*;
     let query1 = Query {
