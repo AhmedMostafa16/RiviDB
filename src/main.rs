@@ -5,7 +5,6 @@ mod value;
 use value::{RecordType, ValueType};
 
 use serde_json::Value;
-use std::collections::HashSet;
 use std::env;
 use std::fs::File;
 use std::io::BufReader;
