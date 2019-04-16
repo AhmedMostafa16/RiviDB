@@ -1,32 +1,35 @@
 extern crate serde_json;
 
+mod query_engine;
 mod value;
+use value::{RecordType, ValueType};
+
 use serde_json::Value;
 use std::collections::HashSet;
 use std::env;
 use std::fs::File;
 use std::io::BufReader;
-use value::{RecordType, ValueType};
+use std::rc::Rc;
 
 fn json_to_value(json: Value) -> ValueType {
     match json {
         Value::Null => ValueType::Null,
-        Value::String(s) => ValueType::String(s),
         Value::Bool(b) => ValueType::Integer(b as i64),
         Value::Number(n) => n
             .as_i64()
             .map(ValueType::Integer)
             .or(n.as_f64().map(ValueType::Float))
             .unwrap(),
-        Value::Array(arr) => ValueType::Set(
+        Value::String(s) => ValueType::String(Rc::new(s)),
+        Value::Array(arr) => ValueType::Set(Rc::new(
             arr.into_iter()
                 .map(|v| match v {
                     Value::String(s) => s,
                     _ => panic!("Expected list of strings"),
                 })
                 .collect(),
-        ),
-        o => panic!("Objects not suppoted: {:?}", o),
+        )),
+        o => panic!("Objects not supported: {:?}", o),
     }
 }
 
@@ -47,11 +50,12 @@ fn read_data(filename: &str) -> Vec<RecordType> {
     if let Value::Array(data) = json {
         data.into_iter().map(|v| json_to_record(v)).collect()
     } else {
-        panic!("Non-record object: {:?}", json)
+        panic!("Unexpected JSON contents.")
     }
 }
 
 fn main() {
+    query_engine::test();
     let args: Vec<String> = env::args().collect();
     let data = read_data(&args[1]);
     println!("{:?}", data);
