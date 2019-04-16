@@ -12,18 +12,18 @@ pub enum FuncType {
 }
 
 #[derive(Debug)]
-pub enum Condition<'a> {
+pub enum Condition {
     True,
     False,
     Column(usize),
-    Func(FuncType, &'a Condition<'a>, &'a Condition<'a>),
+    Func(FuncType, Box<Condition>, Box<Condition>),
     Const(ValueType),
 }
 
 #[derive(Debug)]
-pub struct Query<'a> {
+pub struct Query {
     pub select: Vec<usize>,
-    pub filter: Condition<'a>,
+    pub filter: Condition,
 }
 
 fn eval(record: &Vec<ValueType>, condition: &Condition) -> ValueType {
@@ -86,11 +86,14 @@ pub fn test() {
     ];
 
     use self::Condition::*;
-    let col2 = Column(2usize);
-    let constf1 = Const(ValueType::Float(1.));
+
     let query = Query {
         select: vec![1usize],
-        filter: Func(FuncType::GT, &col2, &constf1),
+        filter: Func(
+            FuncType::GT,
+            Box::new(Column(2usize)),
+            Box::new(Const(ValueType::Float(1.0))),
+        ),
     };
 
     let result = run(&query, &dataset);
