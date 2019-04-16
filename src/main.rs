@@ -18,7 +18,7 @@ fn json_to_value(json: Value) -> ValueType {
         Value::Number(n) => n
             .as_i64()
             .map(ValueType::Integer)
-            .or(n.as_f64().map(ValueType::Float))
+            .or(n.as_f64().map(|f| ValueType::Integer((1000.0 * f) as i64)))
             .unwrap(),
         Value::String(s) => ValueType::String(Rc::new(s)),
         Value::Array(arr) => ValueType::Set(Rc::new(

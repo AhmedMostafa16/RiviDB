@@ -39,10 +39,8 @@ fn eval(record: &Vec<ValueType>, condition: &Condition) -> ValueType {
                 (&FuncType::Or, Bool(b1), Bool(b2)) => Bool(b1 || b2),
                 (&FuncType::LT, Integer(i1), Integer(i2)) => Bool(i1 < i2),
                 (&FuncType::LT, Timestamp(t1), Timestamp(t2)) => Bool(t1 < t2),
-                (&FuncType::LT, Float(f1), Float(f2)) => Bool(f1 < f2),
                 (&FuncType::GT, Integer(i1), Integer(i2)) => Bool(i1 > i2),
                 (&FuncType::GT, Timestamp(t1), Timestamp(t2)) => Bool(t1 > t2),
-                (&FuncType::GT, Float(f1), Float(f2)) => Bool(f1 > f2),
                 (functype, v1, v2) => panic!(
                     "Type error: function {:?} not defined for values {:?} and {:?}",
                     functype, v1, v2
@@ -70,21 +68,21 @@ fn run(query: &Query, source: &Vec<Vec<ValueType>>) -> Vec<Vec<ValueType>> {
     result
 }
 
-fn record(timestamp: u64, url: &str, loadtime: f64) -> Vec<ValueType> {
+fn record(timestamp: u64, url: &str, loadtime: i64) -> Vec<ValueType> {
     vec![
         ValueType::Timestamp(timestamp),
         ValueType::String(Rc::new(url.to_string())),
-        ValueType::Float(loadtime),
+        ValueType::Integer(loadtime),
     ]
 }
 
 pub fn test() {
     let dataset = vec![
-        record(1200, "/", 0.4),
-        record(1231, "/", 0.3),
-        record(1132, "/admin", 1.2),
-        record(994, "/admin/crashdash", 3.4),
-        record(931, "/", 0.8),
+        record(1200, "/", 400),
+        record(1231, "/", 300),
+        record(1132, "/admin", 1200),
+        record(994, "/admin/crashdash", 3400),
+        record(931, "/", 800),
     ];
 
     use self::Condition::*;
@@ -98,7 +96,7 @@ pub fn test() {
             Box::new(Func(
                 LT,
                 Box::new(Column(2usize)),
-                Box::new(Const(Float(1.0))),
+                Box::new(Const(Integer(1000))),
             )),
             Box::new(Func(
                 GT,
