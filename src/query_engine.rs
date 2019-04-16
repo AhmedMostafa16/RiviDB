@@ -8,7 +8,7 @@ pub struct Query {
     pub select: Vec<usize>,
     pub filter: Expr,
     pub group_by: Vec<usize>,
-    pub aggregate: Vec<(Aggregator, usize)>,
+    pub aggregate: Vec<(Aggregator, Expr)>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -76,7 +76,7 @@ fn run(query: &Query, source: &Vec<Vec<ValueType>>) -> Vec<Vec<ValueType>> {
 fn run_aggregate(
     select: &Vec<usize>,
     filter: &Expr,
-    aggregation: &Vec<(Aggregator, usize)>,
+    aggregation: &Vec<(Aggregator, Expr)>,
     source: &Vec<Vec<ValueType>>,
 ) -> Vec<Vec<ValueType>> {
     let mut groups: HashMap<Vec<ValueType>, Vec<ValueType>> = HashMap::new();
@@ -87,8 +87,8 @@ fn run_aggregate(
             let accumulator = groups
                 .entry(group)
                 .or_insert(aggregation.iter().map(|x| x.0.zero()).collect());
-            for (i, &(ref agg_func, col)) in aggregation.iter().enumerate() {
-                accumulator[i] = agg_func.reduce(&accumulator[i], &record[col]);
+            for (i, &(ref agg_func, ref expr)) in aggregation.iter().enumerate() {
+                accumulator[i] = agg_func.reduce(&accumulator[i], &eval(&record, expr));
             }
         }
     }
@@ -171,13 +171,13 @@ pub fn test() {
         select: vec![1usize],
         filter: True,
         group_by: vec![1usize],
-        aggregate: vec![(Aggregator::Count, 0)],
+        aggregate: vec![(Aggregator::Count, Const(Integer(0)))],
     };
     let sum_query = Query {
         select: vec![1usize],
         filter: True,
         group_by: vec![1usize],
-        aggregate: vec![(Aggregator::Sum, 2)],
+        aggregate: vec![(Aggregator::Sum, Column(2))],
     };
 
     let result1 = run(&query1, &dataset);
