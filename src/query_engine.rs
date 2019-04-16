@@ -7,7 +7,7 @@ use value::ValueType;
 pub struct Query {
     pub select: Vec<usize>,
     pub filter: Expr,
-    pub groupBy: Vec<usize>,
+    pub group_by: Vec<usize>,
     pub aggregate: Vec<(Aggregator, usize)>,
 }
 
@@ -154,7 +154,7 @@ pub fn test() {
                 Box::new(Const(Timestamp(1000))),
             )),
         ),
-        groupBy: vec![],
+        group_by: vec![],
         aggregate: vec![],
     };
     let query2 = Query {
@@ -164,32 +164,32 @@ pub fn test() {
             Box::new(Column(1usize)),
             Box::new(Const(String(Rc::new("/".to_string())))),
         ),
-        groupBy: vec![],
+        group_by: vec![],
         aggregate: vec![],
     };
     let count_query = Query {
         select: vec![1usize],
         filter: True,
-        groupBy: vec![1usize],
+        group_by: vec![1usize],
         aggregate: vec![(Aggregator::Count, 0)],
     };
     let sum_query = Query {
         select: vec![1usize],
         filter: True,
-        groupBy: vec![1usize],
+        group_by: vec![1usize],
         aggregate: vec![(Aggregator::Sum, 2)],
     };
 
     let result1 = run(&query1, &dataset);
     let result2 = run(&query2, &dataset);
     let count_result = run_aggregate(
-        &count_query.groupBy,
+        &count_query.group_by,
         &count_query.filter,
         &count_query.aggregate,
         &dataset,
     );
     let sum_result = run_aggregate(
-        &sum_query.groupBy,
+        &sum_query.group_by,
         &sum_query.filter,
         &sum_query.aggregate,
         &dataset,
