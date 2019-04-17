@@ -1,9 +1,9 @@
 extern crate serde_json;
 
+mod aggregator;
+mod expression;
 mod query_engine;
 mod value;
-mod expression;
-mod aggregator;
 
 use value::{RecordType, ValueType};
 
@@ -22,7 +22,7 @@ fn json_to_value(json: Value) -> ValueType {
             .map(ValueType::Integer)
             .or(n.as_f64().map(|f| ValueType::Integer((1000.0 * f) as i64)))
             .unwrap(),
-        Value::String(s) => ValueType::String(Rc::new(s)),
+        Value::String(s) => ValueType::Str(Rc::new(s)),
         Value::Array(arr) => ValueType::Set(Rc::new(
             arr.into_iter()
                 .map(|v| match v {
