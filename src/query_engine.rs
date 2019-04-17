@@ -1,3 +1,5 @@
+use aggregator::*;
+use expression::*;
 use std::collections::HashMap;
 use std::iter::Iterator;
 use std::rc::Rc;
@@ -10,52 +12,8 @@ pub struct Query {
     pub aggregate: Vec<(Aggregator, Expr)>,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum Aggregator {
-    Sum,
-    Count,
-}
-
-impl Aggregator {
-    fn zero(self) -> ValueType {
-        match self {
-            Aggregator::Sum | Aggregator::Count => ValueType::Integer(0),
-        }
-    }
-
-    fn reduce(self, accumulator: &ValueType, elem: &ValueType) -> ValueType {
-        match (self, accumulator, elem) {
-            (Aggregator::Sum, &ValueType::Integer(i1), &ValueType::Integer(i2)) => {
-                ValueType::Integer(i1 + i2)
-            }
-            (Aggregator::Count, accumulator, &ValueType::Null) => accumulator.clone(),
-            (Aggregator::Count, &ValueType::Integer(i1), _) => ValueType::Integer(i1 + 1),
-            (aggregator, accumulator, elem) => panic!(
-                "Type error: aggregator {:?} not defined for values {:?} and {:?}",
-                aggregator, *accumulator, *elem
-            ),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum Expr {
-    Column(usize),
-    Func(FuncType, Box<Expr>, Box<Expr>),
-    Const(ValueType),
-}
-
-#[derive(Debug)]
-pub enum FuncType {
-    Equals,
-    LT,
-    GT,
-    And,
-    Or,
-}
-
 impl Query {
-    fn run(&self, source: &Vec<Vec<ValueType>>) -> Vec<Vec<ValueType>> {
+    pub fn run(&self, source: &Vec<Vec<ValueType>>) -> Vec<Vec<ValueType>> {
         if self.aggregate.len() == 0 {
             run_select_query(&self.select, &self.filter, source)
         } else {
@@ -102,30 +60,6 @@ fn run_aggregate_query(
         result.push(group);
     }
     result
-}
-
-fn eval(record: &Vec<ValueType>, condition: &Expr) -> ValueType {
-    use self::Expr::*;
-    use self::ValueType::*;
-    match condition {
-        &Func(ref functype, ref exp1, ref exp2) => {
-            match (functype, eval(record, &exp1), eval(record, &exp2)) {
-                (&FuncType::Equals, v1, v2) => Bool(v1 == v2),
-                (&FuncType::And, Bool(b1), Bool(b2)) => Bool(b1 && b2),
-                (&FuncType::Or, Bool(b1), Bool(b2)) => Bool(b1 || b2),
-                (&FuncType::LT, Integer(i1), Integer(i2)) => Bool(i1 < i2),
-                (&FuncType::LT, Timestamp(t1), Timestamp(t2)) => Bool(t1 < t2),
-                (&FuncType::GT, Integer(i1), Integer(i2)) => Bool(i1 > i2),
-                (&FuncType::GT, Timestamp(t1), Timestamp(t2)) => Bool(t1 > t2),
-                (functype, v1, v2) => panic!(
-                    "Type error: function {:?} not defined for values {:?} and {:?}",
-                    functype, v1, v2
-                ),
-            }
-        }
-        &Column(col) => record[col].clone(),
-        &Const(ref value) => value.clone(),
-    }
 }
 
 pub fn test() {
