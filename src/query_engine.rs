@@ -23,7 +23,7 @@ impl Query {
         if self.aggregate.len() == 0 {
             run_select_query(&query.select, &query.filter, source)
         } else {
-            run_aggregate_query(&query.select, &query.filter, &query.aggregate, source)
+            run_aggregation_query(&query.select, &query.filter, &query.aggregate, source)
         }
     }
 
@@ -56,7 +56,7 @@ fn run_select_query(
         .collect()
 }
 
-fn run_aggregate_query(
+fn run_aggregation_query(
     select: &Vec<Expr>,
     filter: &Expr,
     aggregation: &Vec<(Aggregator, Expr)>,
