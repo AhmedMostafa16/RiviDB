@@ -7,7 +7,6 @@ use value::ValueType;
 pub struct Query {
     pub select: Vec<usize>,
     pub filter: Expr,
-    pub group_by: Vec<usize>,
     pub aggregate: Vec<(Aggregator, Expr)>,
 }
 
@@ -41,8 +40,6 @@ impl Aggregator {
 
 #[derive(Debug)]
 pub enum Expr {
-    True,
-    False,
     Column(usize),
     Func(FuncType, Box<Expr>, Box<Expr>),
     Const(ValueType),
@@ -57,23 +54,31 @@ pub enum FuncType {
     Or,
 }
 
-fn run(query: &Query, source: &Vec<Vec<ValueType>>) -> Vec<Vec<ValueType>> {
+impl Query {
+    fn run(&self, source: &Vec<Vec<ValueType>>) -> Vec<Vec<ValueType>> {
+        if self.aggregate.len() == 0 {
+            run_select_query(&self.select, &self.filter, source)
+        } else {
+            run_aggregate_query(&self.select, &self.filter, &self.aggregate, source)
+        }
+    }
+}
+
+fn run_select_query(
+    select: &Vec<usize>,
+    filter: &Expr,
+    source: &Vec<Vec<ValueType>>,
+) -> Vec<Vec<ValueType>> {
     let mut result = Vec::new();
     for record in source.iter() {
-        if eval(record, &query.filter) == ValueType::Bool(true) {
-            result.push(
-                query
-                    .select
-                    .iter()
-                    .map(|&col| record[col].clone())
-                    .collect(),
-            );
+        if eval(record, filter) == ValueType::Bool(true) {
+            result.push(select.iter().map(|&col| record[col].clone()).collect());
         }
     }
     result
 }
 
-fn run_aggregate(
+fn run_aggregate_query(
     select: &Vec<usize>,
     filter: &Expr,
     aggregation: &Vec<(Aggregator, Expr)>,
@@ -105,8 +110,6 @@ fn eval(record: &Vec<ValueType>, condition: &Expr) -> ValueType {
     use self::Expr::*;
     use self::ValueType::*;
     match condition {
-        &True => Bool(true),
-        &False => Bool(false),
         &Func(ref functype, ref exp1, ref exp2) => {
             match (functype, eval(record, &exp1), eval(record, &exp2)) {
                 (&FuncType::Equals, v1, v2) => Bool(v1 == v2),
@@ -154,7 +157,6 @@ pub fn test() {
                 Box::new(Const(Timestamp(1000))),
             )),
         ),
-        group_by: vec![],
         aggregate: vec![],
     };
     let query2 = Query {
@@ -164,36 +166,23 @@ pub fn test() {
             Box::new(Column(1usize)),
             Box::new(Const(String(Rc::new("/".to_string())))),
         ),
-        group_by: vec![],
         aggregate: vec![],
     };
     let count_query = Query {
         select: vec![1usize],
-        filter: True,
-        group_by: vec![1usize],
+        filter: Const(Bool(true)),
         aggregate: vec![(Aggregator::Count, Const(Integer(0)))],
     };
     let sum_query = Query {
         select: vec![1usize],
-        filter: True,
-        group_by: vec![1usize],
+        filter: Const(Bool(true)),
         aggregate: vec![(Aggregator::Sum, Column(2))],
     };
 
-    let result1 = run(&query1, &dataset);
-    let result2 = run(&query2, &dataset);
-    let count_result = run_aggregate(
-        &count_query.group_by,
-        &count_query.filter,
-        &count_query.aggregate,
-        &dataset,
-    );
-    let sum_result = run_aggregate(
-        &sum_query.group_by,
-        &sum_query.filter,
-        &sum_query.aggregate,
-        &dataset,
-    );
+    let result1 = query1.run(&dataset);
+    let result2 = query2.run(&dataset);
+    let count_result = count_query.run(&dataset);
+    let sum_result = sum_query.run(&dataset);
 
     println!("Result 1: {:?}", result1);
     println!("Result 2: {:?}", result2);
