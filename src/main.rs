@@ -3,6 +3,7 @@ extern crate serde_json;
 mod aggregator;
 mod expression;
 mod query_engine;
+mod util;
 mod value;
 
 use value::{RecordType, ValueType};
