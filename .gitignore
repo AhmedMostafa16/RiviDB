@@ -1,5 +1,6 @@
 /target
 **/*.rs.bk
+/data
 
 
 #Added by cargo

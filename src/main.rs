@@ -1,11 +1,13 @@
 extern crate serde_json;
 
 mod aggregator;
+mod columns;
 mod expression;
 mod query_engine;
 mod util;
 mod value;
 
+use columns::columnarize;
 use value::{RecordType, ValueType};
 
 use serde_json::Value;
@@ -61,5 +63,6 @@ fn main() {
     query_engine::test();
     let args: Vec<String> = env::args().collect();
     let data = read_data(&args[1]);
-    println!("{:?}", data);
+    let cols = columnarize(data);
+    println!("{:?}", cols[3].iter().collect::<Vec<_>>());
 }
