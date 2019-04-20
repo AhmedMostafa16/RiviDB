@@ -228,16 +228,16 @@ enum VecType {
 }
 
 impl VecType {
-    fn new_with_value(value: &ValueType) -> VecType {
+    fn new_with_value(value: ValueType) -> VecType {
         // TODO: fix
         use self::VecType::*;
         match value {
-            &ValueType::Null => NullVec(0),
-            &ValueType::Bool(_) => BoolVec(Vec::new()),
-            &ValueType::Timestamp(_) => TimestampVec(Vec::new()),
-            &ValueType::Integer(_) => IntegerVec(Vec::new()),
-            &ValueType::Str(_) => StringVec(Vec::new()),
-            &ValueType::Set(_) => SetVec(Vec::new()),
+            ValueType::Null => NullVec(1),
+            ValueType::Bool(b) => BoolVec(vec![b]),
+            ValueType::Timestamp(t) => TimestampVec(vec![t]),
+            ValueType::Integer(i) => IntegerVec(vec![i]),
+            ValueType::Str(s) => StringVec(vec![Rc::try_unwrap(s).unwrap()]),
+            ValueType::Set(s) => SetVec(vec![Rc::try_unwrap(s).unwrap()]),
         }
     }
 
@@ -335,7 +335,7 @@ pub fn columnarize(records: Vec<RecordType>) -> Vec<Box<Column>> {
         for (name, value) in record {
             let to_insert = match field_map.entry(name) {
                 Entry::Vacant(e) => {
-                    e.insert(VecType::new_with_value(&value));
+                    e.insert(VecType::new_with_value(value));
                     None
                 }
                 Entry::Occupied(mut e) => {
