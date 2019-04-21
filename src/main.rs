@@ -60,9 +60,9 @@ fn read_data(filename: &str) -> Vec<RecordType> {
 }
 
 fn main() {
-    query_engine::test();
     let args: Vec<String> = env::args().collect();
     let data = read_data(&args[1]);
     let cols = columnarize(data);
-    println!("{:?}", cols[3].iter().collect::<Vec<_>>());
+    println!("{:?}", cols[2].iter().collect::<Vec<_>>());
+    query_engine::test(&cols);
 }
