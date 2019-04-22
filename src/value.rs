@@ -1,5 +1,6 @@
 use std::fmt;
 use std::rc::Rc;
+use heapsize::HeapSizeOf;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ValueType {
@@ -22,6 +23,17 @@ impl fmt::Display for ValueType {
             &ValueType::Integer(i) => write!(f, "{}", i),
             &ValueType::Str(ref s) => write!(f, "\"{}\"", s),
             &ValueType::Set(ref vec) => write!(f, "{:?}", vec),
+        }
+    }
+}
+
+impl HeapSizeOf for ValueType {
+    fn heap_size_of_children(&self)->usize{
+        use ValueType::*;
+        match self {
+            &Null |&Bool(_)|&Timestamp(_)|&Integer(_)=>0,
+            &Str(ref r)=>r.heap_size_of_children(),
+            &Set(ref r)=> r.heap_size_of_children(),
         }
     }
 }
