@@ -1,11 +1,13 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::rc::Rc;
+
 use value::ValueType;
 
 #[derive(Debug)]
 pub enum Expr {
-    ColIndex(usize),
     ColName(Rc<String>),
+    ColIndex(usize),
     Func(FuncType, Box<Expr>, Box<Expr>),
     Const(ValueType),
 }
@@ -22,6 +24,7 @@ pub enum FuncType {
 use self::Expr::*;
 use self::FuncType::*;
 use self::ValueType::*;
+
 impl Expr {
     pub fn eval(&self, record: &Vec<ValueType>) -> ValueType {
         match self {
@@ -34,7 +37,7 @@ impl Expr {
                     (&LT,     Timestamp(t1), Timestamp(t2)) => Bool(t1 < t2),
                     (&GT,     Integer(i1),   Integer(i2))   => Bool(i1 > i2),
                     (&GT,     Timestamp(t1), Timestamp(t2)) => Bool(t1 > t2),
-                    (&GT,     Integer(i),    Timestamp(t)) if i>=0=> Bool(i as u64 >t),
+                    (&GT,     Integer(i),    Timestamp(t))  if i >= 0 => Bool(i as u64 > t),
                     (functype, v1, v2) => panic!("Type error: function {:?} not defined for values {:?} and {:?}", functype, v1, v2),
                 },
             &ColIndex(col) => record[col].clone(),
@@ -53,13 +56,33 @@ impl Expr {
                 expr1.compile(column_names),
                 expr2.compile(column_names),
             ),
-            &ColIndex(_) => panic!("Uncompiled Expr should not contain ColumnIndex"),
+            &ColIndex(_) => panic!("Uncompiled Expr should not contain ColumnIndex."),
+        }
+    }
+
+    pub fn find_colnames(&self) -> HashSet<Rc<String>> {
+        let mut result = HashSet::new();
+        self.add_colnames(&mut result);
+        result
+    }
+
+    pub fn add_colnames(&self, result: &mut HashSet<Rc<String>>) {
+        match self {
+            &ColName(ref name) => {
+                result.insert(name.clone());
+            }
+            &Func(_, ref expr1, ref expr2) => {
+                expr1.add_colnames(result);
+                expr2.add_colnames(result);
+            }
+            _ => (),
         }
     }
 
     pub fn func(ftype: FuncType, expr1: Expr, expr2: Expr) -> Expr {
         Func(ftype, Box::new(expr1), Box::new(expr2))
     }
+
     pub fn col(name: &str) -> Expr {
         ColName(Rc::new(name.to_string()))
     }

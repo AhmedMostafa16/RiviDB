@@ -6,7 +6,6 @@ mod expression;
 mod query_engine;
 mod util;
 mod value;
-
 use columns::columnarize;
 use value::{RecordType, ValueType};
 

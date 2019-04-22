@@ -229,7 +229,6 @@ enum VecType {
 
 impl VecType {
     fn new_with_value(value: ValueType) -> VecType {
-        // TODO: fix
         use self::VecType::*;
         match value {
             ValueType::Null => NullVec(1),
