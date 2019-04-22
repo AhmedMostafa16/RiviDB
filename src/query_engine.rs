@@ -123,6 +123,9 @@ fn run_select_query(
     let mut result = Vec::new();
     let mut record = Vec::with_capacity(source.len());
     let mut rows_touched = 0;
+    if source.len() == 0 {
+        return (result, rows_touched);
+    }
     loop {
         record.clear();
         for i in 0..source.len() {
@@ -178,7 +181,7 @@ fn run_aggregation_query(
     (result, rows_touched)
 }
 
-fn print_query_result(results: &QueryResult) {
+pub fn print_query_result(results: &QueryResult) {
     let rt = results.stats.runtime_ns;
     let fmt_time = if rt < 1000 {
         format!("{}ns", rt)
@@ -191,7 +194,7 @@ fn print_query_result(results: &QueryResult) {
     };
 
     println!(
-        "\nScanned {} rows in {}!",
+        "Scanned {} rows in {}!\n",
         results.stats.rows_scanned, fmt_time
     );
     println!("{}", format_results(&results.colnames, &results.rows));

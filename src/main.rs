@@ -1,13 +1,17 @@
 extern crate serde_json;
 extern crate time;
+#[macro_use]
+extern crate nom;
 
 mod aggregator;
 mod columns;
 mod expression;
+mod parser;
 mod query_engine;
 mod util;
 mod value;
 use columns::columnarize;
+use columns::Column;
 use value::{RecordType, ValueType};
 
 use serde_json::Value;
@@ -59,10 +63,47 @@ fn read_data(filename: &str) -> Vec<RecordType> {
     }
 }
 
+fn repl(datasource: &Vec<Box<Column>>) {
+    use std::io::{stdin, stdout, Write};
+    loop {
+        let mut s = String::new();
+        print!("rivi> ");
+        let _ = stdout().flush();
+        stdin()
+            .read_line(&mut s)
+            .expect("Did not enter a correct string");
+        if let Some('\n') = s.chars().next_back() {
+            s.pop();
+        }
+        if let Some('\r') = s.chars().next_back() {
+            s.pop();
+        }
+        if s == "exit" {
+            break;
+        }
+        if s.chars().next_back() != Some(';') {
+            s.push(';');
+        }
+        match parser::parse_query(s.as_bytes()) {
+            Ok((remaining, query)) => {
+                println!("{:?}, {:?}\n", query, remaining);
+                let result = query.run(datasource);
+                query_engine::print_query_result(&result);
+            }
+            err => println!("Failed to parse query! {:?}", err),
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let data = read_data(&args[1]);
+    let data = read_data(if args.len() > 1 {
+        &args[1]
+    } else {
+        "test2.json"
+    });
     let cols = columnarize(data);
     println!("{:?}", cols[2].iter().collect::<Vec<_>>());
-    query_engine::test(&cols);
+    //query_engine::test(&cols);
+    repl(&cols);
 }
