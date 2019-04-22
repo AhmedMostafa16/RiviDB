@@ -1,12 +1,12 @@
+use heapsize::HeapSizeOf;
 use std::boxed::Box;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::iter;
 use std::rc::Rc;
 use value::{RecordType, ValueType};
-use heapsize::HeapSizeOf;
 
-pub trait Column :HeapSizeOf {
+pub trait Column: HeapSizeOf {
     fn get_name(&self) -> &str;
     fn iter(&self) -> ColIter;
 }
@@ -218,15 +218,15 @@ impl Column for MixedColumn {
     }
 }
 
-impl HeapSizeOf for NullColumn{
-    fn heap_size_of_children(&self)->usize {
+impl HeapSizeOf for NullColumn {
+    fn heap_size_of_children(&self) -> usize {
         self.name.heap_size_of_children()
     }
 }
 
 impl HeapSizeOf for BoolColumn {
     fn heap_size_of_children(&self) -> usize {
-        self.name.heap_size_of_children()+ self.values.heap_size_of_children()
+        self.name.heap_size_of_children() + self.values.heap_size_of_children()
     }
 }
 

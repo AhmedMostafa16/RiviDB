@@ -13,6 +13,7 @@ mod util;
 mod value;
 use columns::columnarize;
 use columns::Column;
+use heapsize::HeapSizeOf;
 use value::{RecordType, ValueType};
 
 use serde_json::Value;
@@ -104,7 +105,11 @@ fn main() {
         "test2.json"
     });
     let cols = columnarize(data);
-    println!("{:?}", cols[2].iter().collect::<Vec<_>>());
+    let bytes_in_ram = cols.heap_size_of_children();
+    println!(
+        "Loaded data into {:.2} MiB in RAM.",
+        bytes_in_ram as f64 / 1024f64 / 1024f64
+    );
     //query_engine::test(&cols);
     repl(&cols);
 }
