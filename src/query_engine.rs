@@ -141,6 +141,9 @@ fn run_aggregation_query(
                 accumulator[i] = agg_func.reduce(&accumulator[i], &expr.eval(&record));
             }
         }
+        if source.len() == 0 {
+            break;
+        }
     }
 
     let mut result: Vec<Vec<ValueType>> = Vec::new();
@@ -199,14 +202,21 @@ pub fn test(source: &Vec<Box<Column>>) {
         filter: Const(Bool(true)),
         aggregate: vec![(Aggregator::Sum, Expr::col("loadtime"))],
     };
+    let missing_col_query = Query {
+        select: vec![],
+        filter: Const(Bool(true)),
+        aggregate: vec![(Aggregator::Sum, Expr::col("doesnotexist"))],
+    };
 
     let result1 = query1.run(source);
     let result2 = query2.run(source);
     let count_result = count_query.run(source);
     let sum_result = sum_query.run(source);
+    let missing_col_query = missing_col_query.run(source);
 
     println!("{}\n", format_results(&result1));
     println!("{}\n", format_results(&result2));
     println!("{}\n", format_results(&count_result));
     println!("{}\n", format_results(&sum_result));
+    println!("{}\n", format_results(&missing_col_query.run(source)));
 }
