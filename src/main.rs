@@ -1,4 +1,5 @@
 extern crate serde_json;
+extern crate time;
 
 mod aggregator;
 mod columns;

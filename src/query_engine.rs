@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::Iterator;
 use std::rc::Rc;
+use time::precise_time_ns;
 
 use aggregator::*;
 use columns::ColIter;
@@ -17,8 +18,19 @@ pub struct Query {
     pub aggregate: Vec<(Aggregator, Expr)>,
 }
 
+pub struct QueryStats {
+    pub runtime_ns: u64,
+    pub rows_scanned: u64,
+}
+
+pub struct QueryResult {
+    pub colnames: Vec<Rc<String>>,
+    pub rows: Vec<Vec<ValueType>>,
+    pub stats: QueryStats,
+}
+
 impl Query {
-    pub fn run(&self, source: &Vec<Box<Column>>) -> (Vec<Rc<String>>, Vec<Vec<ValueType>>) {
+    pub fn run(&self, source: &Vec<Box<Column>>) -> QueryResult {
         let referenced_cols = self.find_referenced_cols();
         let efficient_source: Vec<&Box<Column>> = source
             .iter()
@@ -39,7 +51,8 @@ impl Query {
             .map(|&(agg, ref expr)| (agg, expr.compile(&column_indices)))
             .collect();
 
-        let result = if self.aggregate.len() == 0 {
+        let start_time_ns = precise_time_ns();
+        let (result_rows, rows_touched) = if self.aggregate.len() == 0 {
             run_select_query(&compiled_selects, &compiled_filter, &mut coliter)
         } else {
             run_aggregation_query(
@@ -50,7 +63,14 @@ impl Query {
             )
         };
 
-        (self.result_column_names(), result)
+        QueryResult {
+            colnames: self.result_column_names(),
+            rows: result_rows,
+            stats: QueryStats {
+                runtime_ns: precise_time_ns() - start_time_ns,
+                rows_scanned: rows_touched,
+            },
+        }
     }
 
     fn find_referenced_cols(&self) -> HashSet<Rc<String>> {
@@ -99,20 +119,22 @@ fn run_select_query(
     select: &Vec<Expr>,
     filter: &Expr,
     source: &mut Vec<ColIter>,
-) -> Vec<Vec<ValueType>> {
+) -> (Vec<Vec<ValueType>>, u64) {
     let mut result = Vec::new();
     let mut record = Vec::with_capacity(source.len());
+    let mut rows_touched = 0;
     loop {
         record.clear();
         for i in 0..source.len() {
             match source[i].next() {
                 Some(item) => record.push(item),
-                None => return result,
+                None => return (result, rows_touched),
             }
         }
         if filter.eval(&record) == ValueType::Bool(true) {
             result.push(select.iter().map(|expr| expr.eval(&record)).collect());
         }
+        rows_touched += 1
     }
 }
 
@@ -121,9 +143,10 @@ fn run_aggregation_query(
     filter: &Expr,
     aggregation: &Vec<(Aggregator, Expr)>,
     source: &mut Vec<ColIter>,
-) -> Vec<Vec<ValueType>> {
+) -> (Vec<Vec<ValueType>>, u64) {
     let mut groups: HashMap<Vec<ValueType>, Vec<ValueType>> = HashMap::new();
     let mut record = Vec::with_capacity(source.len());
+    let mut rows_touched = 0;
     'outer: loop {
         record.clear();
         for i in 0..source.len() {
@@ -144,6 +167,7 @@ fn run_aggregation_query(
         if source.len() == 0 {
             break;
         }
+        rows_touched += 1
     }
 
     let mut result: Vec<Vec<ValueType>> = Vec::new();
@@ -151,13 +175,31 @@ fn run_aggregation_query(
         group.extend(aggregate);
         result.push(group);
     }
-    result
+    (result, rows_touched)
 }
 
-fn format_results(r: &(Vec<Rc<String>>, Vec<Vec<ValueType>>)) -> String {
-    let &(ref colnames, ref results) = r;
+fn print_query_result(results: &QueryResult) {
+    let rt = results.stats.runtime_ns;
+    let fmt_time = if rt < 1000 {
+        format!("{}ns", rt)
+    } else if rt < 1000_0000 {
+        format!("{}μs", rt / 1000)
+    } else if rt < 1000_0000_0000 {
+        format!("{}ms", rt / 1000_000)
+    } else {
+        format!("{}s", rt / 1000_000_000)
+    };
+
+    println!(
+        "\nScanned {} rows in {}!",
+        results.stats.rows_scanned, fmt_time
+    );
+    println!("{}", format_results(&results.colnames, &results.rows));
+}
+
+fn format_results(colnames: &Vec<Rc<String>>, rows: &Vec<Vec<ValueType>>) -> String {
     let strcolnames: Vec<&str> = colnames.iter().map(|ref s| s.clone() as &str).collect();
-    let formattedrows: Vec<Vec<String>> = results
+    let formattedrows: Vec<Vec<String>> = rows
         .iter()
         .map(|row| row.iter().map(|val| format!("{}", val)).collect())
         .collect();
@@ -214,9 +256,9 @@ pub fn test(source: &Vec<Box<Column>>) {
     let sum_result = sum_query.run(source);
     let missing_col_query = missing_col_query.run(source);
 
-    println!("{}\n", format_results(&result1));
-    println!("{}\n", format_results(&result2));
-    println!("{}\n", format_results(&count_result));
-    println!("{}\n", format_results(&sum_result));
-    println!("{}\n", format_results(&missing_col_query.run(source)));
+    print_query_result(&result1);
+    print_query_result(&result2);
+    print_query_result(&count_result);
+    print_query_result(&sum_result);
+    print_query_result(&missing_col_query);
 }

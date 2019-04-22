@@ -7,3 +7,4 @@ discription = "Fast in-memory analytics datastore in Rust"
 
 [dependencies]
 serde_json = "1.0"
+time = "0.1"
