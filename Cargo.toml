@@ -1,6 +1,6 @@
 [package]
 name = "rividb"
-version = "0.1.0"
+version = "1.5.3"
 authors = ["Ahmed Mostafa <amk67482@gmail.com>"]
 license = "MIT"
 discription = "Fast in-memory analytics datastore in Rust"

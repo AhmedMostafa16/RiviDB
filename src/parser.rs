@@ -121,8 +121,10 @@ named!(function<&[u8], Expr>,
         ft: function_name >>
         char!('(') >>
         e1: expr >>
+        opt!(multispace) >>
         char!(',') >>
         e2: expr >>
+        opt!(multispace) >>
         char!(')') >>
         (Expr::func(ft, e1, e2))
     )
