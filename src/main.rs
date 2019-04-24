@@ -3,9 +3,11 @@ extern crate time;
 #[macro_use]
 extern crate nom;
 extern crate heapsize;
+extern crate rustyline;
 
 mod aggregator;
 mod columns;
+mod csv_loader;
 mod expression;
 mod parser;
 mod query_engine;
@@ -68,12 +70,11 @@ fn read_data(filename: &str) -> Vec<RecordType> {
 
 fn repl(datasource: &Vec<Box<Column>>) {
     use std::io::{stdin, stdout, Write};
+    let mut rl = rustyline::Editor::<()>::new();
+    rl.load_history(".rivi_history");
     loop {
-        let mut s = String::new();
-        print!("rivi> ");
-        let _ = stdout().flush();
-        stdin()
-            .read_line(&mut s)
+        let mut s = rl
+            .readline("rivi>> ")
             .expect("Did not enter a correct string");
         if let Some('\n') = s.chars().next_back() {
             s.pop();
@@ -87,6 +88,7 @@ fn repl(datasource: &Vec<Box<Column>>) {
         if s.chars().next_back() != Some(';') {
             s.push(';');
         }
+        rl.add_history_entry(s.as_ref());
         match parser::parse_query(s.as_bytes()) {
             Ok((remaining, query)) => {
                 println!("{:?}, {:?}\n", query, remaining);
@@ -95,16 +97,13 @@ fn repl(datasource: &Vec<Box<Column>>) {
             }
             err => println!("Failed to parse query! {:?}", err),
         }
+        rl.save_history(".rivi_history").unwrap();
     }
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let data = read_data(if args.len() > 1 {
-        &args[1]
-    } else {
-        "test2.json"
-    });
+    let data = csv_loader::load_csv_file(&args[1]);
     let cols = columnarize(data);
     let bytes_in_ram = cols.heap_size_of_children();
     let columnarization_start_time = precise_time_s();
@@ -113,6 +112,5 @@ fn main() {
         bytes_in_ram as f64 / 1024f64 / 1024f64,
         precise_time_s() - columnarization_start_time
     );
-    //query_engine::test(&cols);
-    repl(&cols);
+    repl(&cols)
 }
