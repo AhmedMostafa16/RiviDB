@@ -6,6 +6,10 @@ use std::iter;
 use std::rc::Rc;
 use value::{RecordType, ValueType};
 
+pub struct Batch {
+    pub cols: Vec<Box<Column>>,
+}
+
 pub trait Column: HeapSizeOf {
     fn get_name(&self) -> &str;
     fn iter(&self) -> ColIter;
@@ -44,9 +48,7 @@ impl Column for NullColumn {
 
     fn iter<'a>(&'a self) -> ColIter<'a> {
         let iter = iter::repeat(ValueType::Null).take(self.length);
-        ColIter {
-            iter: Box::new(iter),
-        }
+        ColIter { iter: Box::new(iter) }
     }
 }
 
@@ -71,9 +73,7 @@ impl Column for BoolColumn {
 
     fn iter<'a>(&'a self) -> ColIter<'a> {
         let iter = self.values.iter().map(|&b| ValueType::Bool(b));
-        ColIter {
-            iter: Box::new(iter),
-        }
+        ColIter { iter: Box::new(iter) }
     }
 }
 
@@ -98,9 +98,7 @@ impl Column for TimestampColumn {
 
     fn iter<'a>(&'a self) -> ColIter<'a> {
         let iter = self.values.iter().map(|&t| ValueType::Timestamp(t));
-        ColIter {
-            iter: Box::new(iter),
-        }
+        ColIter { iter: Box::new(iter) }
     }
 }
 
@@ -125,9 +123,7 @@ impl Column for IntegerColumn {
 
     fn iter<'a>(&'a self) -> ColIter<'a> {
         let iter = self.values.iter().map(|&i| ValueType::Integer(i));
-        ColIter {
-            iter: Box::new(iter),
-        }
+        ColIter { iter: Box::new(iter) }
     }
 }
 
@@ -151,13 +147,10 @@ impl Column for StringColumn {
     }
 
     fn iter<'a>(&'a self) -> ColIter<'a> {
-        let iter = self
-            .values
-            .iter()
-            .map(|s| ValueType::Str(Rc::new(s.clone())));
-        ColIter {
-            iter: Box::new(iter),
-        }
+        let iter = self.values.iter().map(
+            |s| ValueType::Str(Rc::new(s.clone())),
+        );
+        ColIter { iter: Box::new(iter) }
     }
 }
 
@@ -181,13 +174,10 @@ impl Column for SetColumn {
     }
 
     fn iter<'a>(&'a self) -> ColIter<'a> {
-        let iter = self
-            .values
-            .iter()
-            .map(|s| ValueType::Set(Rc::new(s.clone())));
-        ColIter {
-            iter: Box::new(iter),
-        }
+        let iter = self.values.iter().map(
+            |s| ValueType::Set(Rc::new(s.clone())),
+        );
+        ColIter { iter: Box::new(iter) }
     }
 }
 
@@ -212,9 +202,13 @@ impl Column for MixedColumn {
 
     fn iter<'a>(&'a self) -> ColIter<'a> {
         let iter = self.values.iter().cloned();
-        ColIter {
-            iter: Box::new(iter),
-        }
+        ColIter { iter: Box::new(iter) }
+    }
+}
+
+impl HeapSizeOf for Batch {
+    fn heap_size_of_children(&self) -> usize {
+        self.cols.heap_size_of_children()
     }
 }
 
@@ -285,48 +279,60 @@ impl VecType {
 
     fn push(&mut self, value: ValueType) -> Option<ValueType> {
         match self {
-            &mut VecType::NullVec(ref mut n) => match value {
-                ValueType::Null => {
-                    *n += 1;
-                    None
+            &mut VecType::NullVec(ref mut n) => {
+                match value {
+                    ValueType::Null => {
+                        *n += 1;
+                        None
+                    }
+                    _ => Some(value),
                 }
-                _ => Some(value),
-            },
-            &mut VecType::BoolVec(ref mut v) => match value {
-                ValueType::Bool(b) => {
-                    v.push(b);
-                    None
+            }
+            &mut VecType::BoolVec(ref mut v) => {
+                match value {
+                    ValueType::Bool(b) => {
+                        v.push(b);
+                        None
+                    }
+                    _ => Some(value),
                 }
-                _ => Some(value),
-            },
-            &mut VecType::TimestampVec(ref mut v) => match value {
-                ValueType::Timestamp(t) => {
-                    v.push(t);
-                    None
+            }
+            &mut VecType::TimestampVec(ref mut v) => {
+                match value {
+                    ValueType::Timestamp(t) => {
+                        v.push(t);
+                        None
+                    }
+                    _ => Some(value),
                 }
-                _ => Some(value),
-            },
-            &mut VecType::IntegerVec(ref mut v) => match value {
-                ValueType::Integer(i) => {
-                    v.push(i);
-                    None
+            }
+            &mut VecType::IntegerVec(ref mut v) => {
+                match value {
+                    ValueType::Integer(i) => {
+                        v.push(i);
+                        None
+                    }
+                    _ => Some(value),
                 }
-                _ => Some(value),
-            },
-            &mut VecType::StringVec(ref mut v) => match value {
-                ValueType::Str(s) => {
-                    v.push(Rc::try_unwrap(s).unwrap());
-                    None
+            }
+            &mut VecType::StringVec(ref mut v) => {
+                match value {
+                    ValueType::Str(s) => {
+                        v.push(Rc::try_unwrap(s).unwrap());
+                        None
+                    }
+                    _ => Some(value),
                 }
-                _ => Some(value),
-            },
-            &mut VecType::SetVec(ref mut v) => match value {
-                ValueType::Set(s) => {
-                    v.push(Rc::try_unwrap(s).unwrap());
-                    None
+            }
+            &mut VecType::SetVec(ref mut v) => {
+                match value {
+                    ValueType::Set(s) => {
+                        v.push(Rc::try_unwrap(s).unwrap());
+                        None
+                    }
+                    _ => Some(value),
                 }
-                _ => Some(value),
-            },
+            }
             &mut VecType::MixedVec(ref mut v) => {
                 v.push(value);
                 None
@@ -336,24 +342,12 @@ impl VecType {
 
     fn to_mixed(self) -> VecType {
         match self {
-            VecType::NullVec(n) => {
-                VecType::MixedVec(iter::repeat(ValueType::Null).take(n).collect())
-            }
-            VecType::BoolVec(v) => {
-                VecType::MixedVec(v.into_iter().map(|b| ValueType::Bool(b)).collect())
-            }
-            VecType::TimestampVec(v) => {
-                VecType::MixedVec(v.into_iter().map(|t| ValueType::Timestamp(t)).collect())
-            }
-            VecType::IntegerVec(v) => {
-                VecType::MixedVec(v.into_iter().map(|i| ValueType::Integer(i)).collect())
-            }
-            VecType::StringVec(v) => {
-                VecType::MixedVec(v.into_iter().map(|s| ValueType::Str(Rc::new(s))).collect())
-            }
-            VecType::SetVec(v) => {
-                VecType::MixedVec(v.into_iter().map(|s| ValueType::Set(Rc::new(s))).collect())
-            }
+            VecType::NullVec(n) => VecType::MixedVec(iter::repeat(ValueType::Null).take(n).collect()),
+            VecType::BoolVec(v) => VecType::MixedVec(v.into_iter().map(|b| ValueType::Bool(b)).collect()),
+            VecType::TimestampVec(v) => VecType::MixedVec(v.into_iter().map(|t| ValueType::Timestamp(t)).collect()),
+            VecType::IntegerVec(v) => VecType::MixedVec(v.into_iter().map(|i| ValueType::Integer(i)).collect()),
+            VecType::StringVec(v) => VecType::MixedVec(v.into_iter().map(|s| ValueType::Str(Rc::new(s))).collect()),
+            VecType::SetVec(v) => VecType::MixedVec(v.into_iter().map(|s| ValueType::Set(Rc::new(s))).collect()),
             vec @ VecType::MixedVec(_) => vec,
         }
     }
@@ -371,7 +365,7 @@ impl VecType {
     }
 }
 
-pub fn columnarize(records: Vec<RecordType>) -> Vec<Box<Column>> {
+pub fn columnarize(records: Vec<RecordType>) -> Batch {
     let mut field_map = BTreeMap::new();
     for record in records {
         for (name, value) in record {
@@ -402,5 +396,5 @@ pub fn columnarize(records: Vec<RecordType>) -> Vec<Box<Column>> {
         columns.push(values.to_column(name))
     }
 
-    columns
+    Batch { cols: columns }
 }

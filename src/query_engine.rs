@@ -1,12 +1,11 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::iter::Iterator;
+use std::ops::Add;
 use std::rc::Rc;
 use time::precise_time_ns;
 
 use aggregator::*;
-use columns::ColIter;
-use columns::Column;
+use columns::{Batch, ColIter, Column};
 use expression::*;
 use util::fmt_table;
 use value::ValueType;
@@ -29,24 +28,34 @@ pub struct QueryResult {
     pub stats: QueryStats,
 }
 
+impl Add for QueryStats {
+    type Output = QueryStats;
+
+    fn add(self, other: QueryStats) -> QueryStats {
+        QueryStats {
+            runtime_ns: self.runtime_ns + other.runtime_ns,
+            rows_scanned: self.rows_scanned + other.rows_scanned,
+        }
+    }
+}
+
 impl Query {
-    pub fn run(&self, source: &Vec<Box<Column>>) -> QueryResult {
+    pub fn run(&self, source: &Batch) -> QueryResult {
         let referenced_cols = self.find_referenced_cols();
         let efficient_source: Vec<&Box<Column>> = source
+            .cols
             .iter()
             .filter(|col| referenced_cols.contains(&col.get_name().to_string()))
             .collect();
         let mut coliter = efficient_source.iter().map(|col| col.iter()).collect();
 
         let column_indices = create_colname_map(&efficient_source);
-        let compiled_selects = self
-            .select
+        let compiled_selects = self.select
             .iter()
             .map(|expr| expr.compile(&column_indices))
             .collect();
         let compiled_filter = self.filter.compile(&column_indices);
-        let compiled_aggregate = self
-            .aggregate
+        let compiled_aggregate = self.aggregate
             .iter()
             .map(|&(agg, ref expr)| (agg, expr.compile(&column_indices)))
             .collect();
@@ -70,6 +79,25 @@ impl Query {
                 runtime_ns: precise_time_ns() - start_time_ns,
                 rows_scanned: rows_touched,
             },
+        }
+    }
+
+    pub fn run_batches(&self, batches: &Vec<Batch>) -> QueryResult {
+        let mut combined_rows = Vec::new();
+        let mut combined_stats = QueryStats {
+            runtime_ns: 0,
+            rows_scanned: 0,
+        };
+
+        for batch in batches {
+            let QueryResult { rows, stats, .. } = self.run(batch);
+            combined_rows.extend(rows); // TODO: This is not the right way to combine results!
+            combined_stats = combined_stats + stats;
+        }
+        QueryResult {
+            colnames: self.result_column_names(),
+            rows: combined_rows,
+            stats: combined_stats,
         }
     }
 
@@ -115,11 +143,7 @@ fn create_colname_map(source: &Vec<&Box<Column>>) -> HashMap<String, usize> {
     columns
 }
 
-fn run_select_query(
-    select: &Vec<Expr>,
-    filter: &Expr,
-    source: &mut Vec<ColIter>,
-) -> (Vec<Vec<ValueType>>, u64) {
+fn run_select_query(select: &Vec<Expr>, filter: &Expr, source: &mut Vec<ColIter>) -> (Vec<Vec<ValueType>>, u64) {
     let mut result = Vec::new();
     let mut record = Vec::with_capacity(source.len());
     let mut rows_touched = 0;
@@ -160,9 +184,12 @@ fn run_aggregation_query(
         }
         if filter.eval(&record) == ValueType::Bool(true) {
             let group: Vec<ValueType> = select.iter().map(|expr| expr.eval(&record)).collect();
-            let accumulator = groups
-                .entry(group)
-                .or_insert(aggregation.iter().map(|x| x.0.zero()).collect());
+            let accumulator = groups.entry(group).or_insert(
+                aggregation
+                    .iter()
+                    .map(|x| x.0.zero())
+                    .collect(),
+            );
             for (i, &(ref agg_func, ref expr)) in aggregation.iter().enumerate() {
                 accumulator[i] = agg_func.reduce(&accumulator[i], &expr.eval(&record));
             }
@@ -195,15 +222,15 @@ pub fn print_query_result(results: &QueryResult) {
 
     println!(
         "Scanned {} rows in {}!\n",
-        results.stats.rows_scanned, fmt_time
+        results.stats.rows_scanned,
+        fmt_time
     );
     println!("{}", format_results(&results.colnames, &results.rows));
 }
 
 fn format_results(colnames: &Vec<Rc<String>>, rows: &Vec<Vec<ValueType>>) -> String {
     let strcolnames: Vec<&str> = colnames.iter().map(|ref s| s.clone() as &str).collect();
-    let formattedrows: Vec<Vec<String>> = rows
-        .iter()
+    let formattedrows: Vec<Vec<String>> = rows.iter()
         .map(|row| row.iter().map(|val| format!("{}", val)).collect())
         .collect();
     let strrows = formattedrows
@@ -214,7 +241,7 @@ fn format_results(colnames: &Vec<Rc<String>>, rows: &Vec<Vec<ValueType>>) -> Str
     fmt_table(&strcolnames, &strrows)
 }
 
-pub fn test(source: &Vec<Box<Column>>) {
+pub fn test(source: &Batch) {
     use self::Expr::*;
     use self::FuncType::*;
     use ValueType::*;
