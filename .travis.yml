@@ -1,0 +1,58 @@
+dist: xenial
+sudo: false
+language: rust
+
+cache:
+  - apt: true
+  - cargo: true
+  - bundler: true
+  - directories:
+    - doc/target
+
+branches:
+  only:
+    - master
+
+matrix:
+  allow_failures:
+    - rust: nightly
+  include:
+    - rust: stable
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - libssl-dev
+      before_script:
+        - rustup component add rustfmt-preview
+      script:
+        - cargo clean
+        - cargo test
+      after_success:
+        - rustfmt src/* -f --config-path .rustfmt.toml 
+        - bash <(curl https://raw.githubusercontent.com/xd009642/tarpaulin/master/travis-install.sh)
+        - USE_SKEPTIC=1 cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID 
+
+    - rust: beta
+      before_script:
+        - rustup component add rustfmt-preview
+      script:
+        - cargo clean
+        - cargo test -j6
+      after_success:
+        - rustfmt src/* -f --config-path .rustfmt.toml 
+
+    - rust: nightly
+      before_script:
+        - rustup component add rustfmt-preview
+      script:
+        - cargo clean
+        - cargo test -j6
+      after_success:
+        - rustfmt src/* -f --config-path .rustfmt.toml 
+
+    - rust: stable
+      script:
+        - cargo clean
+        - cargo doc --no-deps
+        - rm -f target/doc/.lock
