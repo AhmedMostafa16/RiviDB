@@ -38,7 +38,7 @@ matrix:
         - rustup component add rustfmt-preview
       script:
         - cargo clean
-        - cargo test -j6
+        - cargo test -j6 --release 
       after_success:
         - rustfmt src/* -f --config-path .rustfmt.toml 
 
@@ -47,7 +47,7 @@ matrix:
         - rustup component add rustfmt-preview
       script:
         - cargo clean
-        - cargo test -j6
+        - cargo test -j6 --release
       after_success:
         - rustfmt src/* -f --config-path .rustfmt.toml 
 
